@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="减脂记录">
+  <rect width="512" height="512" rx="112" fill="#f5f5f7"/>
+  <rect x="54" y="54" width="404" height="404" rx="92" fill="rgba(255,255,255,0.78)" stroke="rgba(17,17,17,0.10)" stroke-width="2"/>
+  <path d="M142 298c34-6 55-31 78-58 21-24 42-49 75-55 32-6 57 8 76 23" fill="none" stroke="#111111" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M142 355c38-8 65-20 91-39 21-16 40-34 66-39 29-6 50 5 71 20" fill="none" stroke="#8e8e93" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="142" cy="298" r="16" fill="#111111"/>
+  <circle cx="295" cy="185" r="16" fill="#111111"/>
+  <circle cx="370" cy="208" r="16" fill="#111111"/>
+  <text x="256" y="158" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Arial, sans-serif" font-size="88" font-weight="800" fill="#111111">脂</text>
+</svg>

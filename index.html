@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>减脂记录</title>
+    <meta name="theme-color" content="#f5f5f7" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="减脂记录" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Body Log</p>
+          <h1 id="page-title">减脂记录</h1>
+          <p class="subcopy">每天记录体重和腰围，趋势会自己说话。</p>
+        </div>
+        <div class="today-panel" aria-label="今日概览">
+          <span id="todayDate"></span>
+          <strong id="latestWeight">-- kg</strong>
+          <small id="latestWaist">-- cm</small>
+        </div>
+      </section>
+
+      <section class="layout">
+        <form class="entry-form" id="entryForm">
+          <div class="form-head">
+            <h2>今日输入</h2>
+            <button type="button" class="ghost-button" id="fillTodayButton">今天</button>
+          </div>
+
+          <label>
+            日期
+            <input type="date" id="dateInput" required />
+          </label>
+
+          <div class="input-grid">
+            <label>
+              体重 <span>kg</span>
+              <input
+                type="number"
+                id="weightInput"
+                min="20"
+                max="300"
+                step="0.01"
+                placeholder="68.45"
+                required
+              />
+            </label>
+
+            <label>
+              腰围 <span>cm</span>
+              <input
+                type="number"
+                id="waistInput"
+                min="30"
+                max="250"
+                step="0.01"
+                placeholder="78.20"
+                required
+              />
+            </label>
+          </div>
+
+          <button class="primary-button" type="submit">保存记录</button>
+          <p class="note" id="saveNote" role="status"></p>
+        </form>
+
+        <section class="stats" aria-label="趋势指标">
+          <article>
+            <span>周平均体重</span>
+            <strong id="weeklyWeightAvg">--</strong>
+          </article>
+          <article>
+            <span>周平均腰围</span>
+            <strong id="weeklyWaistAvg">--</strong>
+          </article>
+          <article>
+            <span>体重变化</span>
+            <strong id="weightDelta">--</strong>
+          </article>
+          <article>
+            <span>腰围变化</span>
+            <strong id="waistDelta">--</strong>
+          </article>
+          <article>
+            <span>总体下降趋势</span>
+            <strong id="overallTrend">--</strong>
+          </article>
+          <article>
+            <span>最低体重记录</span>
+            <strong id="lowestWeight">--</strong>
+          </article>
+        </section>
+      </section>
+
+      <section class="chart-section" aria-labelledby="chart-title">
+        <div class="section-head">
+          <div>
+            <h2 id="chart-title">趋势图</h2>
+            <p>黑线为体重，灰线为腰围。</p>
+          </div>
+          <div class="legend" aria-hidden="true">
+            <span><i class="weight-line"></i>体重</span>
+            <span><i class="waist-line"></i>腰围</span>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="trendChart" width="1200" height="520" aria-label="体重和腰围趋势图"></canvas>
+          <div class="empty-state" id="emptyState">
+            <strong>还没有记录</strong>
+            <span>输入第一天的数据后，趋势图会自动生成。</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="records-section" aria-labelledby="records-title">
+        <div class="section-head">
+          <div>
+            <h2 id="records-title">记录</h2>
+            <p>相同日期会自动更新，不会重复添加。</p>
+          </div>
+          <button type="button" class="ghost-button danger" id="clearButton">清空</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>体重</th>
+                <th>腰围</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="recordsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
