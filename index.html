@@ -36,6 +36,17 @@
           </div>
 
           <label>
+            Day <span>可选，不填自动生成</span>
+            <input
+              type="number"
+              id="dayInput"
+              min="1"
+              step="1"
+              placeholder="自动"
+            />
+          </label>
+
+          <label>
             日期
             <input type="date" id="dateInput" required />
           </label>
@@ -50,7 +61,6 @@
                 max="300"
                 step="0.01"
                 placeholder="68.45"
-                required
               />
             </label>
 
@@ -63,10 +73,47 @@
                 max="250"
                 step="0.01"
                 placeholder="78.20"
-                required
               />
             </label>
           </div>
+
+          <label class="check-row">
+            <input type="checkbox" id="pauseMetricsInput" />
+            <span>暂停记录体重/腰围</span>
+          </label>
+
+          <div class="input-grid">
+            <label>
+              训练部位
+              <select id="trainingPartInput">
+                <option value="">未选择</option>
+                <option value="肩">肩</option>
+                <option value="胸">胸</option>
+                <option value="背">背</option>
+                <option value="腿">腿</option>
+                <option value="臀">臀</option>
+                <option value="腹">腹</option>
+                <option value="核心">核心</option>
+                <option value="手臂">手臂</option>
+                <option value="有氧">有氧</option>
+              </select>
+            </label>
+
+            <label class="check-row rest-row">
+              <input type="checkbox" id="restDayInput" />
+              <span>休息日</span>
+            </label>
+          </div>
+
+          <label>
+            训练动作
+            <textarea
+              class="compact-textarea"
+              id="trainingActionsInput"
+              rows="4"
+              placeholder="上斜卧推4×8、飞鸟5×10"
+            ></textarea>
+          </label>
 
           <button class="primary-button" type="submit">保存记录</button>
           <p class="note" id="saveNote" role="status"></p>
@@ -126,23 +173,167 @@
             <h2 id="records-title">记录</h2>
             <p>相同日期会自动更新，不会重复添加。</p>
           </div>
-          <button type="button" class="ghost-button danger" id="clearButton">清空</button>
+          <div class="section-actions">
+            <button type="button" class="ghost-button" id="importButton">批量导入</button>
+            <button type="button" class="ghost-button danger" id="clearButton">清空</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>Day</th>
                 <th>日期</th>
                 <th>体重</th>
                 <th>腰围</th>
+                <th>训练</th>
+                <th>有氧</th>
+                <th>休息</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="recordsBody"></tbody>
           </table>
         </div>
+        <div class="record-cards" id="recordCards"></div>
       </section>
     </main>
+
+    <div class="modal-backdrop" id="importModal" hidden>
+      <section class="import-dialog" role="dialog" aria-modal="true" aria-labelledby="import-title">
+        <div class="section-head">
+          <div>
+            <h2 id="import-title">批量导入</h2>
+            <p>粘贴历史记录，先预览，确认后再写入本地数据。</p>
+          </div>
+          <button type="button" class="ghost-button" id="closeImportButton">关闭</button>
+        </div>
+
+        <label class="import-label">
+          历史记录
+          <textarea
+            id="importText"
+            rows="10"
+            placeholder="Day51 体重：86.00 腰围 85.0cm 胸 上斜卧推4×8 平板卧推4×8"
+          ></textarea>
+        </label>
+
+        <div class="import-actions">
+          <button type="button" class="primary-button compact-button" id="parseImportButton">解析预览</button>
+          <div class="duplicate-options" id="duplicateOptions" hidden>
+            <span>重复 Day：</span>
+            <label><input type="radio" name="duplicateMode" value="overwrite" checked /> 覆盖</label>
+            <label><input type="radio" name="duplicateMode" value="skip" /> 跳过</label>
+          </div>
+        </div>
+
+        <p class="note" id="importNote" role="status"></p>
+
+        <div class="parse-message-box" id="skippedBox" hidden>
+          <strong>被跳过的行</strong>
+          <ul id="skippedList"></ul>
+        </div>
+
+        <div class="parse-message-box failed-box" id="failedBox" hidden>
+          <strong>识别失败的行</strong>
+          <ul id="failedList"></ul>
+        </div>
+
+        <div class="table-wrap preview-wrap" id="previewWrap" hidden>
+          <table>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>日期</th>
+                <th>体重</th>
+                <th>腰围</th>
+                <th>部位</th>
+                <th>动作</th>
+                <th>有氧</th>
+                <th>休息</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody id="previewBody"></tbody>
+          </table>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="ghost-button" id="cancelImportButton">取消</button>
+          <button type="button" class="primary-button compact-button" id="confirmImportButton" disabled>确认导入</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="recordModal" hidden>
+      <form class="import-dialog" id="recordEditForm" role="dialog" aria-modal="true" aria-labelledby="record-edit-title">
+        <div class="section-head">
+          <div>
+            <h2 id="record-edit-title">记录详情</h2>
+            <p>查看或修改单条记录。</p>
+          </div>
+          <button type="button" class="ghost-button" id="closeRecordButton">关闭</button>
+        </div>
+
+        <input type="hidden" id="editRecordKey" />
+
+        <div class="input-grid">
+          <label>
+            Day
+            <input type="number" id="editDayInput" min="1" step="1" />
+          </label>
+          <label>
+            日期
+            <input type="date" id="editDateInput" />
+          </label>
+        </div>
+
+        <div class="input-grid">
+          <label>
+            体重 <span>kg</span>
+            <input type="number" id="editWeightInput" min="20" max="300" step="0.01" />
+          </label>
+          <label>
+            腰围 <span>cm</span>
+            <input type="number" id="editWaistInput" min="30" max="250" step="0.01" />
+          </label>
+        </div>
+
+        <div class="input-grid">
+          <label>
+            训练部位
+            <input type="text" id="editTrainingPartInput" placeholder="肩、胸、背、腿" />
+          </label>
+          <label>
+            有氧
+            <input type="text" id="editCardioInput" placeholder="爬坡35min" />
+          </label>
+        </div>
+
+        <label>
+          训练动作
+          <textarea class="compact-textarea" id="editTrainingActionsInput" rows="4"></textarea>
+        </label>
+
+        <div class="input-grid">
+          <label class="check-row">
+            <input type="checkbox" id="editRestDayInput" />
+            <span>休息日</span>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" id="editPausedInput" />
+            <span>暂停记录体重/腰围</span>
+          </label>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="ghost-button" id="cancelRecordButton">取消</button>
+          <button type="button" class="ghost-button danger" id="deleteRecordButton">删除</button>
+          <button type="submit" class="primary-button compact-button">保存修改</button>
+        </div>
+        <p class="note" id="recordEditNote" role="status"></p>
+      </form>
+    </div>
 
     <script src="app.js"></script>
   </body>
