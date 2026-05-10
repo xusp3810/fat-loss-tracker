@@ -140,6 +140,46 @@ h2 {
   -webkit-backdrop-filter: blur(22px) saturate(165%);
 }
 
+.hero-side {
+  display: grid;
+  gap: 12px;
+  min-width: 224px;
+}
+
+.account-panel {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius);
+  box-shadow: var(--soft-shadow);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+}
+
+.account-panel span,
+.account-panel small {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.account-panel strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .today-panel::after {
   content: "";
   position: absolute;
@@ -724,6 +764,10 @@ th:last-child {
   animation: riseIn 320ms var(--ease) both;
 }
 
+.auth-dialog {
+  width: min(440px, 100%);
+}
+
 .import-label {
   margin-top: 18px;
 }
@@ -882,6 +926,10 @@ th:last-child {
   }
 
   .today-panel {
+    min-width: 0;
+  }
+
+  .hero-side {
     min-width: 0;
   }
 

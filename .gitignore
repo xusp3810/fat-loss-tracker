@@ -17,3 +17,5 @@ build/
 .vscode/
 .idea/
 
+# Local Supabase runtime config
+supabase-config.js

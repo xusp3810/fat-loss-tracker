@@ -41,3 +41,8 @@ http://192.168.1.107:5173/
 
 通过 `localhost` 或 HTTPS 访问时，手机浏览器可以添加到主屏幕。
 
+## Supabase 云同步
+
+云同步是可选增强功能。未配置 Supabase 时，应用继续使用 localStorage 本地模式。
+
+配置步骤见 [SUPABASE_SETUP.md](SUPABASE_SETUP.md)。

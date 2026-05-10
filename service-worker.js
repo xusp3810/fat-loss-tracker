@@ -1,11 +1,13 @@
-const CACHE_NAME = "fat-loss-tracker-v12";
+const CACHE_NAME = "fat-loss-tracker-v16";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./manifest.json",
-  "./icon.svg"
+  "./icon.svg",
+  "./supabase-config.example.js",
+  "./SUPABASE_SETUP.md"
 ];
 
 self.addEventListener("install", (event) => {

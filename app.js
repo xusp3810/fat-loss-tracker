@@ -45,6 +45,20 @@ const editTrainingActionsInput = document.querySelector("#editTrainingActionsInp
 const editRestDayInput = document.querySelector("#editRestDayInput");
 const editPausedInput = document.querySelector("#editPausedInput");
 const recordEditNote = document.querySelector("#recordEditNote");
+const authModal = document.querySelector("#authModal");
+const authForm = document.querySelector("#authForm");
+const authOpenButton = document.querySelector("#authOpenButton");
+const closeAuthButton = document.querySelector("#closeAuthButton");
+const signupButton = document.querySelector("#signupButton");
+const uploadLocalButton = document.querySelector("#uploadLocalButton");
+const pullCloudButton = document.querySelector("#pullCloudButton");
+const logoutButton = document.querySelector("#logoutButton");
+const authEmailInput = document.querySelector("#authEmailInput");
+const authPasswordInput = document.querySelector("#authPasswordInput");
+const authNote = document.querySelector("#authNote");
+const syncStatus = document.querySelector("#syncStatus");
+const accountEmail = document.querySelector("#accountEmail");
+const syncHint = document.querySelector("#syncHint");
 const emptyState = document.querySelector("#emptyState");
 const chart = document.querySelector("#trendChart");
 const ctx = chart.getContext("2d");
@@ -63,6 +77,11 @@ let records = loadRecords();
 let importPreviewRecords = [];
 let importSkippedLines = [];
 let importFailedLines = [];
+let supabaseClient = null;
+let currentUser = null;
+let cloudReady = false;
+let syncInFlight = false;
+let isApplyingCloudRecords = false;
 
 function localDateString(date = new Date()) {
   const year = date.getFullYear();
@@ -122,6 +141,24 @@ function saveRecords() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 }
 
+function setSyncStatus(status, hint = "") {
+  syncStatus.textContent = status;
+  syncHint.textContent = hint;
+}
+
+function getSupabaseConfig() {
+  const config = window.SUPABASE_CONFIG || {};
+  return {
+    url: config.url || window.SUPABASE_URL || "",
+    anonKey: config.anonKey || window.SUPABASE_ANON_KEY || "",
+  };
+}
+
+function isSupabaseConfigured() {
+  const config = getSupabaseConfig();
+  return Boolean(window.supabase && config.url && config.anonKey);
+}
+
 function numberWithSign(value, unit) {
   if (!Number.isFinite(value)) return "--";
   const prefix = value > 0 ? "+" : "";
@@ -145,6 +182,58 @@ function escapeHtml(value) {
 function truncateText(value, maxLength = 28) {
   if (!value || value === "--") return "--";
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function isValidUuid(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function getCloudId(record) {
+  if (isValidUuid(record.cloudId)) return record.cloudId;
+  if (isValidUuid(record.id)) return record.id;
+  return "";
+}
+
+function toCloudRecord(record, options = {}) {
+  const { includeId = false } = options;
+  const payload = {
+    user_id: currentUser?.id,
+    day: Number.isFinite(record.day) ? record.day : null,
+    date: record.date || null,
+    weight: Number.isFinite(record.weight) ? record.weight : null,
+    waist: Number.isFinite(record.waist) ? record.waist : null,
+    training_part: record.trainingPart || null,
+    training_actions: record.trainingActions || null,
+    cardio: record.cardio || null,
+    is_rest_day: Boolean(record.isRestDay),
+    is_paused: Boolean(record.isPaused),
+    note: record.note || record.sourceText || null,
+    updated_at: new Date().toISOString(),
+  };
+  const cloudId = getCloudId(record);
+  if (includeId && cloudId) payload.id = cloudId;
+  return payload;
+}
+
+function fromCloudRecord(row) {
+  return {
+    cloudId: row.id,
+    day: row.day,
+    date: row.date || "",
+    weight: Number.isFinite(row.weight) ? row.weight : row.weight === null ? null : Number(row.weight),
+    waist: Number.isFinite(row.waist) ? row.waist : row.waist === null ? null : Number(row.waist),
+    trainingPart: row.training_part || "",
+    trainingActions: row.training_actions || "",
+    cardio: row.cardio || "",
+    isRestDay: Boolean(row.is_rest_day),
+    isPaused: Boolean(row.is_paused),
+    note: row.note || "",
+    updatedAt: row.updated_at || row.created_at || "",
+  };
+}
+
+function getMigrationKey() {
+  return currentUser ? `fat-loss-tracker.migrated.${currentUser.id}` : "";
 }
 
 function average(values) {
@@ -196,22 +285,29 @@ function updateMetricInputsState() {
 }
 
 function upsertRecord(nextRecord) {
+  const recordToSave = {
+    ...nextRecord,
+    updatedAt: new Date().toISOString(),
+  };
   const existingIndex = records.findIndex((item) => {
-    if (nextRecord.day) return item.day === nextRecord.day;
-    return item.date === nextRecord.date;
+    if (recordToSave.day) return item.day === recordToSave.day;
+    return item.date === recordToSave.date;
   });
   if (existingIndex >= 0) {
-    records[existingIndex] = { ...records[existingIndex], ...nextRecord };
+    records[existingIndex] = { ...records[existingIndex], ...recordToSave };
   } else {
-    records.push(nextRecord);
+    records.push(recordToSave);
   }
   sortRecords(records);
   saveRecords();
+  syncRecordToCloud(recordToSave);
 }
 
 function deleteRecord(key) {
+  const existing = findRecordByKey(key);
   records = records.filter((item) => getRecordKey(item) !== key);
   saveRecords();
+  deleteCloudRecord(existing);
   render();
 }
 
@@ -220,13 +316,151 @@ function findRecordByKey(key) {
 }
 
 function replaceRecordByKey(key, nextRecord) {
+  const recordToSave = {
+    ...nextRecord,
+    updatedAt: new Date().toISOString(),
+  };
   records = records.map((item) => {
     if (getRecordKey(item) !== key) return item;
-    return nextRecord;
+    return recordToSave;
   });
   sortRecords(records);
   saveRecords();
+  syncRecordToCloud(recordToSave);
   render();
+}
+
+async function syncRecordToCloud(record) {
+  if (!cloudReady || !currentUser || isApplyingCloudRecords) return;
+  syncInFlight = true;
+  setSyncStatus("同步中", "正在保存到云端");
+
+  try {
+    const payload = toCloudRecord(record);
+    const cloudId = getCloudId(record);
+    const query = cloudId
+      ? supabaseClient
+          .from("records")
+          .update(payload)
+          .eq("id", cloudId)
+          .select()
+          .single()
+      : supabaseClient
+          .from("records")
+          .upsert(payload, { onConflict: "user_id,day" })
+          .select()
+          .single();
+    const { data, error } = await query;
+    if (error) throw error;
+
+    if (data) {
+      const key = record.day ? `day:${record.day}` : `date:${record.date}`;
+      const local = findRecordByKey(key);
+      if (local) {
+        local.cloudId = data.id;
+        saveRecords();
+      }
+    }
+    setSyncStatus("云同步已开启", currentUser.email);
+  } catch (error) {
+    setSyncStatus("同步失败", error.message || "云端保存失败");
+  } finally {
+    syncInFlight = false;
+  }
+}
+
+async function deleteCloudRecord(record) {
+  if (!cloudReady || !currentUser || !record) return;
+  setSyncStatus("同步中", "正在删除云端记录");
+
+  try {
+    let query = supabaseClient.from("records").delete();
+    const cloudId = getCloudId(record);
+    if (cloudId) {
+      query = query.eq("id", cloudId);
+    } else if (record.day) {
+      query = query.eq("user_id", currentUser.id).eq("day", record.day);
+    } else {
+      return;
+    }
+    const { error } = await query;
+    if (error) throw error;
+    setSyncStatus("云同步已开启", currentUser.email);
+  } catch (error) {
+    setSyncStatus("同步失败", error.message || "云端删除失败");
+  }
+}
+
+function mergeRecordsByDay(localRecords, cloudRecords) {
+  const merged = new Map();
+  [...localRecords, ...cloudRecords].forEach((record) => {
+    const key = record.day ? `day:${record.day}` : getRecordKey(record);
+    const previous = merged.get(key);
+    const previousTime = Date.parse(previous?.updatedAt || previous?.updated_at || 0) || 0;
+    const nextTime = Date.parse(record.updatedAt || record.updated_at || 0) || 0;
+    if (!previous || nextTime >= previousTime) merged.set(key, record);
+  });
+  return sortRecords([...merged.values()]);
+}
+
+async function fetchCloudRecords() {
+  if (!cloudReady || !currentUser) return [];
+  setSyncStatus("同步中", "正在读取云端记录");
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("records")
+      .select("*")
+      .order("day", { ascending: true });
+    if (error) throw error;
+
+    const cloudRecords = (data || []).map(fromCloudRecord);
+    isApplyingCloudRecords = true;
+    records = mergeRecordsByDay(records, cloudRecords);
+    saveRecords();
+    render();
+    isApplyingCloudRecords = false;
+    setSyncStatus("云同步已开启", currentUser.email);
+    return cloudRecords;
+  } catch (error) {
+    isApplyingCloudRecords = false;
+    setSyncStatus("同步失败", error.message || "读取云端失败");
+    return [];
+  }
+}
+
+async function uploadLocalRecordsToCloud(sourceRecords = records) {
+  if (!cloudReady || !currentUser || !sourceRecords.length) return;
+  setSyncStatus("同步中", "正在上传本地数据");
+
+  try {
+    const payload = sourceRecords
+      .filter((record) => Number.isFinite(record.day))
+      .map((record) => {
+        const cloudRecord = toCloudRecord(record, { includeId: false });
+        delete cloudRecord.id;
+        return cloudRecord;
+      });
+    if (!payload.length) return;
+
+    const { data, error } = await supabaseClient
+      .from("records")
+      .upsert(payload, { onConflict: "user_id,day" })
+      .select();
+    if (error) throw error;
+
+    const cloudByDay = new Map((data || []).map((row) => [row.day, row.id]));
+    records = mergeRecordsByDay(records, sourceRecords);
+    records.forEach((record) => {
+      if (cloudByDay.has(record.day)) record.cloudId = cloudByDay.get(record.day);
+    });
+    saveRecords();
+    localStorage.setItem(getMigrationKey(), "1");
+    await fetchCloudRecords();
+    setSyncStatus("云同步已开启", "历史数据已上传云端");
+  } catch (error) {
+    setSyncStatus("同步失败", error.message || "上传本地数据失败");
+  }
 }
 
 function getRange(values) {
@@ -775,6 +1009,127 @@ function handleConfirmImportClick() {
   commitImportPreview();
 }
 
+function renderAuthState() {
+  if (!cloudReady) {
+    accountEmail.textContent = "未登录";
+    authOpenButton.hidden = false;
+    uploadLocalButton.hidden = true;
+    pullCloudButton.hidden = true;
+    logoutButton.hidden = true;
+    setSyncStatus("本地模式", "Supabase 未配置，登录后可云同步");
+    return;
+  }
+
+  if (!currentUser) {
+    accountEmail.textContent = "未登录";
+    authOpenButton.hidden = false;
+    uploadLocalButton.hidden = true;
+    pullCloudButton.hidden = true;
+    logoutButton.hidden = true;
+    setSyncStatus("本地模式", "登录后可云同步");
+    return;
+  }
+
+  accountEmail.textContent = currentUser.email || "已登录";
+  authOpenButton.hidden = true;
+  uploadLocalButton.hidden = false;
+  pullCloudButton.hidden = false;
+  logoutButton.hidden = false;
+  setSyncStatus("云同步已开启", currentUser.email || "");
+}
+
+async function afterAuthChanged(user) {
+  currentUser = user;
+  renderAuthState();
+  if (!currentUser) return;
+
+  const localSnapshot = records.map((record) => ({ ...record }));
+  const cloudRecords = await fetchCloudRecords();
+  const migrationKey = getMigrationKey();
+  const localDayCount = new Set(localSnapshot.filter((record) => Number.isFinite(record.day)).map((record) => record.day)).size;
+  const cloudDayCount = new Set(cloudRecords.filter((record) => Number.isFinite(record.day)).map((record) => record.day)).size;
+  const shouldSuggestMigration = localDayCount > 0 && cloudDayCount < localDayCount;
+
+  if (shouldSuggestMigration && !localStorage.getItem(migrationKey)) {
+    const shouldUpload = window.confirm("检测到本地历史数据，是否上传到云端同步？");
+    if (shouldUpload) await uploadLocalRecordsToCloud(localSnapshot);
+    else localStorage.setItem(migrationKey, "skipped");
+  }
+}
+
+async function initSupabase() {
+  if (!isSupabaseConfigured()) {
+    cloudReady = false;
+    renderAuthState();
+    return;
+  }
+
+  const config = getSupabaseConfig();
+  supabaseClient = window.supabase.createClient(config.url, config.anonKey);
+  cloudReady = true;
+
+  const { data } = await supabaseClient.auth.getSession();
+  await afterAuthChanged(data.session?.user || null);
+
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    afterAuthChanged(session?.user || null);
+  });
+}
+
+function openAuthModal() {
+  authModal.hidden = false;
+  authNote.textContent = cloudReady ? "" : "Supabase 未配置，当前只能使用本地模式。";
+  authEmailInput.focus();
+}
+
+function closeAuthModal() {
+  authModal.hidden = true;
+}
+
+async function signInWithEmail() {
+  if (!cloudReady) {
+    authNote.textContent = "Supabase 未配置，无法登录。";
+    return;
+  }
+
+  authNote.textContent = "登录中...";
+  const { error } = await supabaseClient.auth.signInWithPassword({
+    email: authEmailInput.value.trim(),
+    password: authPasswordInput.value,
+  });
+  if (error) {
+    authNote.textContent = error.message;
+    return;
+  }
+  authNote.textContent = "登录成功。";
+  closeAuthModal();
+}
+
+async function signUpWithEmail() {
+  if (!cloudReady) {
+    authNote.textContent = "Supabase 未配置，无法注册。";
+    return;
+  }
+
+  authNote.textContent = "注册中...";
+  const { error } = await supabaseClient.auth.signUp({
+    email: authEmailInput.value.trim(),
+    password: authPasswordInput.value,
+  });
+  if (error) {
+    authNote.textContent = error.message;
+    return;
+  }
+  authNote.textContent = "注册成功，请按 Supabase 项目设置完成邮箱确认或直接登录。";
+}
+
+async function signOut() {
+  if (!cloudReady || !supabaseClient) return;
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  renderAuthState();
+}
+
 function render() {
   renderStats();
   renderRecords();
@@ -889,6 +1244,22 @@ importModal.addEventListener("click", (event) => {
 parseImportButton.addEventListener("click", handleParseImportClick);
 confirmImportButton.addEventListener("click", handleConfirmImportClick);
 
+authOpenButton.addEventListener("click", openAuthModal);
+closeAuthButton.addEventListener("click", closeAuthModal);
+logoutButton.addEventListener("click", signOut);
+signupButton.addEventListener("click", signUpWithEmail);
+uploadLocalButton.addEventListener("click", () => uploadLocalRecordsToCloud(records.map((record) => ({ ...record }))));
+pullCloudButton.addEventListener("click", fetchCloudRecords);
+
+authForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  signInWithEmail();
+});
+
+authModal.addEventListener("click", (event) => {
+  if (event.target === authModal) closeAuthModal();
+});
+
 clearButton.addEventListener("click", () => {
   if (!records.length) return;
   const confirmed = window.confirm("确定清空所有记录吗？");
@@ -903,6 +1274,7 @@ window.addEventListener("resize", drawChart);
 setToday();
 updateMetricInputsState();
 render();
+initSupabase();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

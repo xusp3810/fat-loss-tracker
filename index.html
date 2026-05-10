@@ -21,10 +21,23 @@
           <h1 id="page-title">减脂记录</h1>
           <p class="subcopy">每天记录体重和腰围，趋势会自己说话。</p>
         </div>
-        <div class="today-panel" aria-label="今日概览">
-          <span id="todayDate"></span>
-          <strong id="latestWeight">-- kg</strong>
-          <small id="latestWaist">-- cm</small>
+        <div class="hero-side">
+          <div class="today-panel" aria-label="今日概览">
+            <span id="todayDate"></span>
+            <strong id="latestWeight">-- kg</strong>
+            <small id="latestWaist">-- cm</small>
+          </div>
+          <section class="account-panel" aria-label="账号和同步状态">
+            <span id="syncStatus">本地模式</span>
+            <strong id="accountEmail">未登录</strong>
+            <small id="syncHint">登录后可云同步</small>
+            <div class="account-actions">
+              <button type="button" class="ghost-button" id="authOpenButton">登录/注册</button>
+              <button type="button" class="ghost-button" id="uploadLocalButton" hidden>上传本地数据到云端</button>
+              <button type="button" class="ghost-button" id="pullCloudButton" hidden>从云端拉取数据</button>
+              <button type="button" class="ghost-button" id="logoutButton" hidden>退出</button>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -335,6 +348,36 @@
       </form>
     </div>
 
+    <div class="modal-backdrop" id="authModal" hidden>
+      <form class="import-dialog auth-dialog" id="authForm" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <div class="section-head">
+          <div>
+            <h2 id="auth-title">账号登录</h2>
+            <p>使用邮箱和密码登录，同步手机与电脑数据。</p>
+          </div>
+          <button type="button" class="ghost-button" id="closeAuthButton">关闭</button>
+        </div>
+
+        <label>
+          邮箱
+          <input type="email" id="authEmailInput" autocomplete="email" placeholder="you@example.com" required />
+        </label>
+
+        <label>
+          密码
+          <input type="password" id="authPasswordInput" autocomplete="current-password" minlength="6" required />
+        </label>
+
+        <div class="modal-footer">
+          <button type="button" class="ghost-button" id="signupButton">注册</button>
+          <button type="submit" class="primary-button compact-button">登录</button>
+        </div>
+        <p class="note" id="authNote" role="status"></p>
+      </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
